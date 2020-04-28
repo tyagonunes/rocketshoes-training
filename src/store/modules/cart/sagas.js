@@ -1,15 +1,43 @@
-import { call, put, all, takeLatest } from 'redux-saga/effects';
+import { call, put, all, takeLatest, select } from 'redux-saga/effects';
+import { toast } from 'react-toastify';
 import api from '../../../services/api';
-import { addToCartSuccess } from './actions'
+import { formatPrice } from '../../../util/format';
+import { addToCartSuccess, updateAmount } from './actions'
 
 // O '*' representa um generator. Functiona como um async/await com mais funcionalidades.
 // O 'yield' é como se fosse o await do generator. Ele agarda a execução do metodo a seguir.
 // O 'call' é responsavel por chamar metodos que sao assincronos e retornam promisses. call(metodo, parametros).
 // O 'put' dispara um action do redux.
+// O 'select' busca informações dentro da store.
 function* addToCart({ id }) {
-  const response = yield call(api.get, `/products/${id}`);
+  const productExists = yield select(
+    state => state.cart.find(p => p.id === id)
+  );
+  
+  const stock = yield call(api.get, `/stock/${id}`)
 
-  yield put(addToCartSuccess(response.data))
+  const stockAmount = stock.data.amount;
+  const currentAmount = productExists ? productExists.amount : 0;
+  const amount = currentAmount + 1;
+
+  if(amount > stockAmount) {
+    toast.error('Quantidade solicitade fora de estoque');    
+    return;
+  }
+
+  if(productExists) {
+    yield put(updateAmount(id, amount))  
+  } else {
+    const response = yield call(api.get, `/products/${id}`);
+    
+    const data = {
+      ...response.data,
+      amount: 1,
+      priceFormatted: formatPrice(response.data.price),
+    };    
+    yield put(addToCartSuccess(data));
+  };
+
 };
 
 // O 'all' cadastra listeners para ouvir actions que foram disparadas.
