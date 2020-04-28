@@ -2,7 +2,7 @@ import { call, put, all, takeLatest, select } from 'redux-saga/effects';
 import { toast } from 'react-toastify';
 import api from '../../../services/api';
 import { formatPrice } from '../../../util/format';
-import { addToCartSuccess, updateAmount } from './actions'
+import { addToCartSuccess, updateAmountSuccess } from './actions'
 
 // O '*' representa um generator. Functiona como um async/await com mais funcionalidades.
 // O 'yield' é como se fosse o await do generator. Ele agarda a execução do metodo a seguir.
@@ -14,7 +14,7 @@ function* addToCart({ id }) {
     state => state.cart.find(p => p.id === id)
   );
   
-  const stock = yield call(api.get, `/stock/${id}`)
+  const stock = yield call(api.get, `/stock/${id}`);
 
   const stockAmount = stock.data.amount;
   const currentAmount = productExists ? productExists.amount : 0;
@@ -26,7 +26,7 @@ function* addToCart({ id }) {
   }
 
   if(productExists) {
-    yield put(updateAmount(id, amount))  
+    yield put(updateAmountSuccess(id, amount))  
   } else {
     const response = yield call(api.get, `/products/${id}`);
     
@@ -40,8 +40,23 @@ function* addToCart({ id }) {
 
 };
 
+function* updateAmount({ id, amount }) {
+  if(amount <= 0) return;
+
+  const stock = yield call(api.get, `/stock/${id}`);
+  const stockAmount = stock.data.amount;
+
+  if(amount > stockAmount) {
+    toast.error('Quantidade solicitade fora de estoque');    
+    return;
+  };
+
+  yield put(updateAmountSuccess(id, amount))
+}
+
 // O 'all' cadastra listeners para ouvir actions que foram disparadas.
 // O 'takeLatest' paga a ultima chamada de uma action e executa uma funcao
 export default all([
   takeLatest('@cart/ADD_REQUEST', addToCart),
+  takeLatest('@cart/UPDATE_AMOUNT_REQUEST', updateAmount),
 ]);
